@@ -1,94 +1,216 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <title>News Sentiment Analyzer</title>
-    <style>
-        /* We'll add CSS in a minute */
-        body { font-family: Arial; padding: 20px; }
-        .card { border: 1px solid #ddd; padding: 15px; margin: 10px; border-radius: 10px; }
-        .positive { background-color: #d4edda; }  /* Green for happy */
-        .negative { background-color: #f8d7da; }  /* Red for sad */
-        .neutral { background-color: #e2e3e5; }   /* Gray for neutral */
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📰 News Sentiment Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
 </head>
 <body>
+    <!-- Header with gradient background -->
+    <header class="header">
+        <div class="container">
+            <h1>📰 News Sentiment Analyzer</h1>
+            <p class="subtitle">Get the latest news and understand the sentiment</p>
+        </div>
+    </header>
 
-    <h1>📰 News Sentiment Analyzer</h1>
-    
-    <!-- Search Box -->
-    <input type="text" id="searchQuery" placeholder="Search news...">
-    <button onclick="searchNews()">Search</button>
+    <!-- Search Section -->
+    <section class="search-section">
+        <div class="container">
+            <div class="search-container">
+                <form id="searchForm" class="search-form">
+                    <div class="form-group">
+                        <label for="queryInput">Search News:</label>
+                        <input 
+                            type="text" 
+                            id="queryInput" 
+                            placeholder="e.g., artificial intelligence, climate change, sports..."
+                            required
+                            minlength="2"
+                        >
+                    </div>
 
-    <!-- Loading message -->
-    <div id="loading" style="display:none;">Loading...</div>
+                    <div class="form-group">
+                        <label for="categorySelect">Category (optional):</label>
+                        <select id="categorySelect">
+                            <option value="">All Categories</option>
+                            <option value="business">Business</option>
+                            <option value="entertainment">Entertainment</option>
+                            <option value="health">Health</option>
+                            <option value="science">Science</option>
+                            <option value="sports">Sports</option>
+                            <option value="technology">Technology</option>
+                        </select>
+                    </div>
 
-    <!-- Results go here -->
-    <div id="results"></div>
+                    <button type="submit" class="btn btn-primary">🔍 Search</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="container">
+        <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+            <div class="spinner"></div>
+            <p>Fetching news...</p>
+        </div>
+
+        <div id="errorMessage" class="alert alert-error" style="display: none;">
+            <span id="errorText"></span>
+        </div>
+
+        <div id="statsSection" class="stats-section" style="display: none;">
+            <div class="stat-card">
+                <h3>Total Articles</h3>
+                <p id="totalArticles">0</p>
+            </div>
+            <div class="stat-card sentiment positive">
+                <h3>😊 Positive</h3>
+                <p id="positiveCount">0</p>
+            </div>
+            <div class="stat-card sentiment negative">
+                <h3>😞 Negative</h3>
+                <p id="negativeCount">0</p>
+            </div>
+            <div class="stat-card sentiment neutral">
+                <h3>😐 Neutral</h3>
+                <p id="neutralCount">0</p>
+            </div>
+        </div>
+
+        <section id="articlesSection" class="articles-section" style="display: none;">
+            <div id="articlesContainer" class="articles-grid"></div>
+        </section>
+
+        <div id="noResults" class="no-results" style="display: none;">
+            <p>No results found. Try a different search!</p>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>© 2024 News Sentiment Analyzer | Powered by NewsAPI & Sentiment Analysis</p>
+        </div>
+    </footer>
 
     <script>
-        async function searchNews() {
-            const query = document.getElementById('searchQuery').value;
-            
-            if (query.length < 2) {
-                alert('Please enter at least 2 characters');
+        const searchForm = document.getElementById('searchForm');
+        const queryInput = document.getElementById('queryInput');
+        const categorySelect = document.getElementById('categorySelect');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        const articlesSection = document.getElementById('articlesSection');
+        const articlesContainer = document.getElementById('articlesContainer');
+        const statsSection = document.getElementById('statsSection');
+        const noResults = document.getElementById('noResults');
+
+        searchForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = queryInput.value.trim();
+            const category = categorySelect.value;
+
+            if (!query || query.length < 2) {
+                showError('Please enter a valid search query (at least 2 characters).');
                 return;
             }
 
-            // Show loading spinner
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('results').innerHTML = '';
+            await fetchNews(query, category);
+        });
 
+        async function fetchNews(query, category) {
             try {
-                // Call your Python backend
-                const response = await fetch(`/search?query=${encodeURIComponent(query)}`);
+                loadingSpinner.style.display = 'flex';
+                errorMessage.style.display = 'none';
+                articlesSection.style.display = 'none';
+                statsSection.style.display = 'none';
+                noResults.style.display = 'none';
+
+                let url = `/search?query=${encodeURIComponent(query)}`;
+                if (category) url += `&category=${category}`;
+
+                const response = await fetch(url);
                 const data = await response.json();
 
-                document.getElementById('loading').style.display = 'none';
+                loadingSpinner.style.display = 'none';
 
-                if (!data.success) {
-                    document.getElementById('results').innerHTML = `<p>❌ ${data.message}</p>`;
+                if (!data.success || !data.articles || data.articles.length === 0) {
+                    showError(data.message || 'No articles found.');
                     return;
                 }
 
-                // Display each article
-                let html = '<h2>Results:</h2>';
-                for (let article of data.articles) {
-                    // Pick color based on sentiment
-                    let sentimentClass = article.sentiment.label;
-                    let emoji = article.sentiment.label === 'positive' ? '😊' : 
-                               (article.sentiment.label === 'negative' ? '😞' : '😐');
-                    
-                    html += `
-                        <div class="card ${sentimentClass}">
-                            <h3>${escapeHtml(article.title)}</h3>
-                            <p>${escapeHtml(article.description)}</p>
-                            <p>${emoji} Sentiment: ${article.sentiment.label}</p>
-                            <small>Source: ${article.source} | ${article.published_at}</small>
-                            <br>
-                            <a href="${article.url}" target="_blank">Read full article →</a>
-                        </div>
-                    `;
-                }
-                document.getElementById('results').innerHTML = html;
+                displayArticles(data.articles);
+                displayStats(data.articles);
 
             } catch (error) {
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('results').innerHTML = '<p>❌ Network error. Check your internet.</p>';
+                loadingSpinner.style.display = 'none';
+                showError('Failed to fetch news. Please check your internet connection.');
             }
         }
 
-        // Prevent hackers from injecting bad code
+        function displayArticles(articles) {
+            articlesContainer.innerHTML = '';
+            
+            articles.forEach((article) => {
+                const sentimentClass = article.sentiment.label === 'positive' ? 'sentiment-positive' :
+                                      (article.sentiment.label === 'negative' ? 'sentiment-negative' : 'sentiment-neutral');
+                const sentimentEmoji = article.sentiment.label === 'positive' ? '😊' :
+                                      (article.sentiment.label === 'negative' ? '😞' : '😐');
+
+                const card = document.createElement('div');
+                card.className = 'article-card';
+                card.innerHTML = `
+                    <div class="article-image">
+                        <img src="${article.image}" alt="${escapeHtml(article.title)}" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'">
+                    </div>
+                    <div class="article-content">
+                        <div class="article-header">
+                            <h3 class="article-title">${escapeHtml(article.title)}</h3>
+                            <span class="sentiment-badge ${sentimentClass}">
+                                ${sentimentEmoji} ${article.sentiment.label.toUpperCase()}
+                            </span>
+                        </div>
+                        <p class="article-description">${escapeHtml(article.description)}</p>
+                        <div class="article-footer">
+                            <small class="article-meta">📍 ${escapeHtml(article.source)} | 📅 ${article.published_at}</small>
+                            <a href="${article.url}" target="_blank" class="read-more">Read More →</a>
+                        </div>
+                    </div>
+                `;
+                articlesContainer.appendChild(card);
+            });
+            
+            articlesSection.style.display = 'block';
+        }
+
+        function displayStats(articles) {
+            let positive = 0, negative = 0, neutral = 0;
+            articles.forEach(a => {
+                if (a.sentiment.label === 'positive') positive++;
+                else if (a.sentiment.label === 'negative') negative++;
+                else neutral++;
+            });
+            
+            document.getElementById('totalArticles').textContent = articles.length;
+            document.getElementById('positiveCount').textContent = positive;
+            document.getElementById('negativeCount').textContent = negative;
+            document.getElementById('neutralCount').textContent = neutral;
+            statsSection.style.display = 'grid';
+        }
+
+        function showError(message) {
+            errorText.textContent = message;
+            errorMessage.style.display = 'block';
+            noResults.style.display = 'block';
+        }
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
-
-        // Press Enter to search
-        document.getElementById('searchQuery').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') searchNews();
-        });
     </script>
 </body>
 </html>
