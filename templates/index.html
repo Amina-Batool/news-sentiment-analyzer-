@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>News Sentiment Analyzer</title>
+    <style>
+        /* We'll add CSS in a minute */
+        body { font-family: Arial; padding: 20px; }
+        .card { border: 1px solid #ddd; padding: 15px; margin: 10px; border-radius: 10px; }
+        .positive { background-color: #d4edda; }  /* Green for happy */
+        .negative { background-color: #f8d7da; }  /* Red for sad */
+        .neutral { background-color: #e2e3e5; }   /* Gray for neutral */
+    </style>
+</head>
+<body>
+
+    <h1>📰 News Sentiment Analyzer</h1>
+    
+    <!-- Search Box -->
+    <input type="text" id="searchQuery" placeholder="Search news...">
+    <button onclick="searchNews()">Search</button>
+
+    <!-- Loading message -->
+    <div id="loading" style="display:none;">Loading...</div>
+
+    <!-- Results go here -->
+    <div id="results"></div>
+
+    <script>
+        async function searchNews() {
+            const query = document.getElementById('searchQuery').value;
+            
+            if (query.length < 2) {
+                alert('Please enter at least 2 characters');
+                return;
+            }
+
+            // Show loading spinner
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').innerHTML = '';
+
+            try {
+                // Call your Python backend
+                const response = await fetch(`/search?query=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                document.getElementById('loading').style.display = 'none';
+
+                if (!data.success) {
+                    document.getElementById('results').innerHTML = `<p>❌ ${data.message}</p>`;
+                    return;
+                }
+
+                // Display each article
+                let html = '<h2>Results:</h2>';
+                for (let article of data.articles) {
+                    // Pick color based on sentiment
+                    let sentimentClass = article.sentiment.label;
+                    let emoji = article.sentiment.label === 'positive' ? '😊' : 
+                               (article.sentiment.label === 'negative' ? '😞' : '😐');
+                    
+                    html += `
+                        <div class="card ${sentimentClass}">
+                            <h3>${escapeHtml(article.title)}</h3>
+                            <p>${escapeHtml(article.description)}</p>
+                            <p>${emoji} Sentiment: ${article.sentiment.label}</p>
+                            <small>Source: ${article.source} | ${article.published_at}</small>
+                            <br>
+                            <a href="${article.url}" target="_blank">Read full article →</a>
+                        </div>
+                    `;
+                }
+                document.getElementById('results').innerHTML = html;
+
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('results').innerHTML = '<p>❌ Network error. Check your internet.</p>';
+            }
+        }
+
+        // Prevent hackers from injecting bad code
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Press Enter to search
+        document.getElementById('searchQuery').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') searchNews();
+        });
+    </script>
+</body>
+</html>
