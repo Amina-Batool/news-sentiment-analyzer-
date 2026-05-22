@@ -21,11 +21,6 @@ NewsDataKey=os.getenv('NEWSDATA_KEY')
 Categories=['business','entertainment','general','health','science','sports','technology']
 
 def analyze_sentiment(text):
-    """
-    This function takes a sentence and tells you if it's happy or sad.
-    Example: "Apple released a new phone" → positive 😊
-             "Earthquake destroyed city" → negative 😞
-    """
     
     # 🛡️ EDGE CASE #1: What if text is empty? (User gave no news)
     if not text or len(text.strip()) == 0:
@@ -53,10 +48,6 @@ def analyze_sentiment(text):
         return {'score': 0, 'label': 'neutral'}
     
 def fetch_news_from_newsapi(query):
-    """
-    Call NewsAPI.org and ask for news about 'query'
-    Example: query = "iPhone" → gets 10 news articles about iPhone
-    """
     
     # 🛡️ EDGE CASE #3: No API key found
     if not NewsApiKey:
@@ -120,7 +111,6 @@ def fetch_news_from_newsapi(query):
         return []
     
 def fetch_news_from_newsdata(query):
-    """Same as above, but calls NewsData.io instead"""
     
     if not NewsDataKey:
         return []
@@ -166,10 +156,6 @@ def fetch_news_from_newsdata(query):
     
 @app.route('/search')
 def search():
-    """
-    This runs when user types something and clicks Search.
-    Example URL: http://localhost:5000/search?query=iPhone
-    """
     
     # Get what user typed (from the URL)
     query = request.args.get('query', '').strip()
@@ -208,7 +194,7 @@ def search():
         # Send back to the webpage
         return jsonify({
             'success': True,
-            'articles': unique_news[:20]  # Max 20 articles
+            'articles': unique_news[:50]  # Max 50 articles
         })
         
     except Exception as e:
@@ -219,7 +205,6 @@ def search():
     
 @app.route('/')
 def index():
-    """Show the homepage (the search box)"""
     return render_template('index.html', categories=Categories)
 
 # Run the app
